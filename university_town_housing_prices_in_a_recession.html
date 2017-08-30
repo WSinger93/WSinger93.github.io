@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+        <meta charset="utf-8" />
+        <title>University_Town_Housing_Prices_in_a_Recession</title>
+        <link rel="stylesheet" href="/theme/css/main.css" />
+
+        <!--[if IE]>
+            <script src="https://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+</head>
+
+<body id="index" class="home">
+        <header id="banner" class="body">
+                <h1><a href="/">Portfolio of William Singer </a></h1>
+                <nav><ul>
+                    <li class="active"><a href="/category/projects.html">Projects</a></li>
+                </ul></nav>
+        </header><!-- /#banner -->
+<section id="content" class="body">
+  <article>
+    <header>
+      <h1 class="entry-title">
+        <a href="/university_town_housing_prices_in_a_recession.html" rel="bookmark"
+           title="Permalink to University_Town_Housing_Prices_in_a_Recession">University_Town_Housing_Prices_in_a_Recession</a></h1>
+    </header>
+
+    <div class="entry-content">
+<footer class="post-info">
+        <abbr class="published" title="2017-08-29T10:20:00-05:00">
+                Published: Tue 29 August 2017
+        </abbr>
+
+        <address class="vcard author">
+                By                         <a class="url fn" href="/author/william-singer.html">William Singer</a>
+        </address>
+<p>In <a href="/category/projects.html">Projects</a>.</p>
+
+</footer><!-- /.post-info -->      <h1>University Town Housing Prices in a Recession</h1>
+<p>This project was designed primarily to practice data cleaning, hypothesis testing, and general use of the pandas library for data analysis. We do so by posing the following hypothesis:</p>
+<p><strong>Hypothesis:</strong> University towns have their mean housing prices less affected by recessions</p>
+<p>To answer this question, we will focus on the most recent recession and will need data on housing prices, which towns are "university towns", and GDP data in order to determine key times in the recession.</p>
+<ul>
+<li>
+<p>The first information we need is a list of university towns, which we can find through the <a href="https://en.wikipedia.org/wiki/List_of_college_towns#College_towns_in_the_United_States">Wikipedia List of College Towns.</a> The list for College Towns in the United States has been copied and pasted into the .txt file 'university_towns.txt'. </p>
+</li>
+<li>
+<p>Secondly, we need data on the mean housing prices by town. The <a href="http://www.zillow.com/research/data/">Zillow Research Data Site</a> provides median housing prices by city in the 'City_Zhvi_AllHomes.csv' file.</p>
+</li>
+<li>
+<p>Finally, we can utilize data from the Bureau of Economic Analysis, US Department of Commerce in order to show the GDP over time of the United States. This information is in the 'gdplex.xls' file.</p>
+</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">ttest_ind</span>
+</pre></div>
+
+
+<h3>University Towns List</h3>
+<p>We will first clean the university towns data and prepare it for use below:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_list_of_university_towns</span><span class="p">():</span>
+    <span class="n">towns</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;university_towns.txt&#39;</span><span class="p">,</span> <span class="n">sep</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span><span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;List&#39;</span><span class="p">]))</span>
+
+    <span class="c1"># Looking at this dataframe, we see that we can make use of the fact that all states have [edit]</span>
+    <span class="c1"># in their names to separate them from the towns</span>
+
+    <span class="n">stateslist</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;List&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="s1">&#39;[edit]&#39;</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="n">stateslist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stateslist</span>
+    <span class="n">towns</span><span class="o">.</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;RegionName&quot;</span><span class="p">,</span><span class="s2">&quot;State&quot;</span><span class="p">]</span>
+
+    <span class="c1"># With our data in the correct columns, we now need to clean up the actual data to remove everything in</span>
+    <span class="c1"># brackets, everything in parenthesis, and extraneous spaces at the end of our data</span>
+
+    <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\[.*\]&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\[.*\]&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\(.*\)&quot;</span><span class="p">,</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+    <span class="n">towns</span> <span class="o">=</span> <span class="n">towns</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">towns</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">towns</span><span class="p">[</span><span class="s1">&#39;RegionName&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;index&#39;</span><span class="p">],</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">towns</span> <span class="o">=</span> <span class="n">towns</span><span class="p">[[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]]</span>
+    <span class="k">return</span> <span class="n">towns</span>
+
+<span class="n">get_list_of_university_towns</span><span class="p">()</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>State</th>
+      <th>RegionName</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>Alabama</td>
+      <td>Auburn</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>Alabama</td>
+      <td>Florence</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>Alabama</td>
+      <td>Jacksonville</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>Alabama</td>
+      <td>Livingston</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>Alabama</td>
+      <td>Montevallo</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Mean Housing Prices</h3>
+<p>With our town data sufficiently cleaned, we now need data on the mean housing prices by town. The <a href="http://www.zillow.com/research/data/">Zillow Research Data Site</a> provides median housing prices by city in the 'City_Zhvi_AllHomes.csv' file. In order t match the GDP data, we see this data needs to be cleaned and converted from monthly numbers to quarterly numbers as well as changing the states acronyms to their full spelling in order to maintain consistency.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">convert_housing_data_to_quarters</span><span class="p">():</span>
+    <span class="n">df1</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;City_Zhvi_AllHomes.csv&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Because we are only looking at the most recent recession, we can go ahead and eliminate any data</span>
+    <span class="c1"># before 2000 and then proceed to group by quarters</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df1</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s1">&#39;2000-01&#39;</span><span class="p">:</span><span class="s1">&#39;2016-08&#39;</span><span class="p">]</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">PeriodIndex</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">freq</span><span class="o">=</span><span class="s1">&#39;Q&#39;</span><span class="p">),</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df1</span><span class="p">[[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">]],</span><span class="n">df</span><span class="p">,</span><span class="n">how</span><span class="o">=</span><span class="s1">&#39;outer&#39;</span><span class="p">,</span><span class="n">left_index</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span><span class="n">right_index</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="c1"># To convert from acronyms, we can use the states dictionary</span>
+
+    <span class="n">states</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;OH&#39;</span><span class="p">:</span> <span class="s1">&#39;Ohio&#39;</span><span class="p">,</span> <span class="s1">&#39;KY&#39;</span><span class="p">:</span> <span class="s1">&#39;Kentucky&#39;</span><span class="p">,</span> <span class="s1">&#39;AS&#39;</span><span class="p">:</span> <span class="s1">&#39;American Samoa&#39;</span><span class="p">,</span> <span class="s1">&#39;NV&#39;</span><span class="p">:</span> <span class="s1">&#39;Nevada&#39;</span><span class="p">,</span> <span class="s1">&#39;WY&#39;</span><span class="p">:</span> <span class="s1">&#39;Wyoming&#39;</span><span class="p">,</span> <span class="s1">&#39;NA&#39;</span><span class="p">:</span> <span class="s1">&#39;National&#39;</span><span class="p">,</span> <span class="s1">&#39;AL&#39;</span><span class="p">:</span> <span class="s1">&#39;Alabama&#39;</span><span class="p">,</span> <span class="s1">&#39;MD&#39;</span><span class="p">:</span> <span class="s1">&#39;Maryland&#39;</span><span class="p">,</span> <span class="s1">&#39;AK&#39;</span><span class="p">:</span> <span class="s1">&#39;Alaska&#39;</span><span class="p">,</span> <span class="s1">&#39;UT&#39;</span><span class="p">:</span> <span class="s1">&#39;Utah&#39;</span><span class="p">,</span> <span class="s1">&#39;OR&#39;</span><span class="p">:</span> <span class="s1">&#39;Oregon&#39;</span><span class="p">,</span> <span class="s1">&#39;MT&#39;</span><span class="p">:</span> <span class="s1">&#39;Montana&#39;</span><span class="p">,</span> <span class="s1">&#39;IL&#39;</span><span class="p">:</span> <span class="s1">&#39;Illinois&#39;</span><span class="p">,</span> <span class="s1">&#39;TN&#39;</span><span class="p">:</span> <span class="s1">&#39;Tennessee&#39;</span><span class="p">,</span> <span class="s1">&#39;DC&#39;</span><span class="p">:</span> <span class="s1">&#39;District of Columbia&#39;</span><span class="p">,</span> <span class="s1">&#39;VT&#39;</span><span class="p">:</span> <span class="s1">&#39;Vermont&#39;</span><span class="p">,</span> <span class="s1">&#39;ID&#39;</span><span class="p">:</span> <span class="s1">&#39;Idaho&#39;</span><span class="p">,</span> <span class="s1">&#39;AR&#39;</span><span class="p">:</span> <span class="s1">&#39;Arkansas&#39;</span><span class="p">,</span> <span class="s1">&#39;ME&#39;</span><span class="p">:</span> <span class="s1">&#39;Maine&#39;</span><span class="p">,</span> <span class="s1">&#39;WA&#39;</span><span class="p">:</span> <span class="s1">&#39;Washington&#39;</span><span class="p">,</span> <span class="s1">&#39;HI&#39;</span><span class="p">:</span> <span class="s1">&#39;Hawaii&#39;</span><span class="p">,</span> <span class="s1">&#39;WI&#39;</span><span class="p">:</span> <span class="s1">&#39;Wisconsin&#39;</span><span class="p">,</span> <span class="s1">&#39;MI&#39;</span><span class="p">:</span> <span class="s1">&#39;Michigan&#39;</span><span class="p">,</span> <span class="s1">&#39;IN&#39;</span><span class="p">:</span> <span class="s1">&#39;Indiana&#39;</span><span class="p">,</span> <span class="s1">&#39;NJ&#39;</span><span class="p">:</span> <span class="s1">&#39;New Jersey&#39;</span><span class="p">,</span> <span class="s1">&#39;AZ&#39;</span><span class="p">:</span> <span class="s1">&#39;Arizona&#39;</span><span class="p">,</span> <span class="s1">&#39;GU&#39;</span><span class="p">:</span> <span class="s1">&#39;Guam&#39;</span><span class="p">,</span> <span class="s1">&#39;MS&#39;</span><span class="p">:</span> <span class="s1">&#39;Mississippi&#39;</span><span class="p">,</span> <span class="s1">&#39;PR&#39;</span><span class="p">:</span> <span class="s1">&#39;Puerto Rico&#39;</span><span class="p">,</span> <span class="s1">&#39;NC&#39;</span><span class="p">:</span> <span class="s1">&#39;North Carolina&#39;</span><span class="p">,</span> <span class="s1">&#39;TX&#39;</span><span class="p">:</span> <span class="s1">&#39;Texas&#39;</span><span class="p">,</span> <span class="s1">&#39;SD&#39;</span><span class="p">:</span> <span class="s1">&#39;South Dakota&#39;</span><span class="p">,</span> <span class="s1">&#39;MP&#39;</span><span class="p">:</span> <span class="s1">&#39;Northern Mariana Islands&#39;</span><span class="p">,</span> <span class="s1">&#39;IA&#39;</span><span class="p">:</span> <span class="s1">&#39;Iowa&#39;</span><span class="p">,</span> <span class="s1">&#39;MO&#39;</span><span class="p">:</span> <span class="s1">&#39;Missouri&#39;</span><span class="p">,</span> <span class="s1">&#39;CT&#39;</span><span class="p">:</span> <span class="s1">&#39;Connecticut&#39;</span><span class="p">,</span> <span class="s1">&#39;WV&#39;</span><span class="p">:</span> <span class="s1">&#39;West Virginia&#39;</span><span class="p">,</span> <span class="s1">&#39;SC&#39;</span><span class="p">:</span> <span class="s1">&#39;South Carolina&#39;</span><span class="p">,</span> <span class="s1">&#39;LA&#39;</span><span class="p">:</span> <span class="s1">&#39;Louisiana&#39;</span><span class="p">,</span> <span class="s1">&#39;KS&#39;</span><span class="p">:</span> <span class="s1">&#39;Kansas&#39;</span><span class="p">,</span> <span class="s1">&#39;NY&#39;</span><span class="p">:</span> <span class="s1">&#39;New York&#39;</span><span class="p">,</span> <span class="s1">&#39;NE&#39;</span><span class="p">:</span> <span class="s1">&#39;Nebraska&#39;</span><span class="p">,</span> <span class="s1">&#39;OK&#39;</span><span class="p">:</span> <span class="s1">&#39;Oklahoma&#39;</span><span class="p">,</span> <span class="s1">&#39;FL&#39;</span><span class="p">:</span> <span class="s1">&#39;Florida&#39;</span><span class="p">,</span> <span class="s1">&#39;CA&#39;</span><span class="p">:</span> <span class="s1">&#39;California&#39;</span><span class="p">,</span> <span class="s1">&#39;CO&#39;</span><span class="p">:</span> <span class="s1">&#39;Colorado&#39;</span><span class="p">,</span> <span class="s1">&#39;PA&#39;</span><span class="p">:</span> <span class="s1">&#39;Pennsylvania&#39;</span><span class="p">,</span> <span class="s1">&#39;DE&#39;</span><span class="p">:</span> <span class="s1">&#39;Delaware&#39;</span><span class="p">,</span> <span class="s1">&#39;NM&#39;</span><span class="p">:</span> <span class="s1">&#39;New Mexico&#39;</span><span class="p">,</span> <span class="s1">&#39;RI&#39;</span><span class="p">:</span> <span class="s1">&#39;Rhode Island&#39;</span><span class="p">,</span> <span class="s1">&#39;MN&#39;</span><span class="p">:</span> <span class="s1">&#39;Minnesota&#39;</span><span class="p">,</span> <span class="s1">&#39;VI&#39;</span><span class="p">:</span> <span class="s1">&#39;Virgin Islands&#39;</span><span class="p">,</span> <span class="s1">&#39;NH&#39;</span><span class="p">:</span> <span class="s1">&#39;New Hampshire&#39;</span><span class="p">,</span> <span class="s1">&#39;MA&#39;</span><span class="p">:</span> <span class="s1">&#39;Massachusetts&#39;</span><span class="p">,</span> <span class="s1">&#39;GA&#39;</span><span class="p">:</span> <span class="s1">&#39;Georgia&#39;</span><span class="p">,</span> <span class="s1">&#39;ND&#39;</span><span class="p">:</span> <span class="s1">&#39;North Dakota&#39;</span><span class="p">,</span> <span class="s1">&#39;VA&#39;</span><span class="p">:</span> <span class="s1">&#39;Virginia&#39;</span><span class="p">}</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">states</span><span class="p">[</span><span class="n">x</span><span class="p">])</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">([</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">])</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+<span class="n">convert_housing_data_to_quarters</span><span class="p">()</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>2000Q1</th>
+      <th>2000Q2</th>
+      <th>2000Q3</th>
+      <th>2000Q4</th>
+      <th>2001Q1</th>
+      <th>2001Q2</th>
+      <th>2001Q3</th>
+      <th>2001Q4</th>
+      <th>2002Q1</th>
+      <th>2002Q2</th>
+      <th>...</th>
+      <th>2014Q2</th>
+      <th>2014Q3</th>
+      <th>2014Q4</th>
+      <th>2015Q1</th>
+      <th>2015Q2</th>
+      <th>2015Q3</th>
+      <th>2015Q4</th>
+      <th>2016Q1</th>
+      <th>2016Q2</th>
+      <th>2016Q3</th>
+    </tr>
+    <tr>
+      <th>State</th>
+      <th>RegionName</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>New York</th>
+      <th>New York</th>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>...</td>
+      <td>515100.000000</td>
+      <td>518966.666667</td>
+      <td>522433.333333</td>
+      <td>523733.333333</td>
+      <td>532066.666667</td>
+      <td>548433.333333</td>
+      <td>562066.666667</td>
+      <td>572433.333333</td>
+      <td>583800.000000</td>
+      <td>599200.0</td>
+    </tr>
+    <tr>
+      <th>California</th>
+      <th>Los Angeles</th>
+      <td>207066.666667</td>
+      <td>214466.666667</td>
+      <td>220966.666667</td>
+      <td>226166.666667</td>
+      <td>233000.000000</td>
+      <td>239100.000000</td>
+      <td>245066.666667</td>
+      <td>253033.333333</td>
+      <td>261966.666667</td>
+      <td>272700.000000</td>
+      <td>...</td>
+      <td>498266.666667</td>
+      <td>509300.000000</td>
+      <td>517966.666667</td>
+      <td>526666.666667</td>
+      <td>534966.666667</td>
+      <td>545333.333333</td>
+      <td>557100.000000</td>
+      <td>567966.666667</td>
+      <td>580566.666667</td>
+      <td>588600.0</td>
+    </tr>
+    <tr>
+      <th>Illinois</th>
+      <th>Chicago</th>
+      <td>138400.000000</td>
+      <td>143633.333333</td>
+      <td>147866.666667</td>
+      <td>152133.333333</td>
+      <td>156933.333333</td>
+      <td>161800.000000</td>
+      <td>166400.000000</td>
+      <td>170433.333333</td>
+      <td>175500.000000</td>
+      <td>177566.666667</td>
+      <td>...</td>
+      <td>188133.333333</td>
+      <td>190233.333333</td>
+      <td>193733.333333</td>
+      <td>194800.000000</td>
+      <td>198933.333333</td>
+      <td>201633.333333</td>
+      <td>202866.666667</td>
+      <td>203733.333333</td>
+      <td>205600.000000</td>
+      <td>207450.0</td>
+    </tr>
+    <tr>
+      <th>Pennsylvania</th>
+      <th>Philadelphia</th>
+      <td>53000.000000</td>
+      <td>53633.333333</td>
+      <td>54133.333333</td>
+      <td>54700.000000</td>
+      <td>55333.333333</td>
+      <td>55533.333333</td>
+      <td>56266.666667</td>
+      <td>57533.333333</td>
+      <td>59133.333333</td>
+      <td>60733.333333</td>
+      <td>...</td>
+      <td>114566.666667</td>
+      <td>115866.666667</td>
+      <td>116600.000000</td>
+      <td>116733.333333</td>
+      <td>117933.333333</td>
+      <td>120700.000000</td>
+      <td>122166.666667</td>
+      <td>123700.000000</td>
+      <td>126000.000000</td>
+      <td>130000.0</td>
+    </tr>
+    <tr>
+      <th>Arizona</th>
+      <th>Phoenix</th>
+      <td>111833.333333</td>
+      <td>114366.666667</td>
+      <td>116000.000000</td>
+      <td>117400.000000</td>
+      <td>119600.000000</td>
+      <td>121566.666667</td>
+      <td>122700.000000</td>
+      <td>124300.000000</td>
+      <td>126533.333333</td>
+      <td>128366.666667</td>
+      <td>...</td>
+      <td>166300.000000</td>
+      <td>167533.333333</td>
+      <td>170500.000000</td>
+      <td>173266.666667</td>
+      <td>176466.666667</td>
+      <td>180600.000000</td>
+      <td>185133.333333</td>
+      <td>188900.000000</td>
+      <td>193100.000000</td>
+      <td>198100.0</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 67 columns</p>
+</div>
+
+<h3>GDP Data</h3>
+<p>Our GDP data now must be cleaned so that we can find 3 important points in the recession: the recession start, end, and bottom. We will proceed using the GDP in billions of chained 2009 dollars.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">clean_GDP</span><span class="p">():</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_excel</span><span class="p">(</span><span class="s1">&#39;gdplev.xls&#39;</span><span class="p">,</span><span class="n">skiprows</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[[</span><span class="s1">&#39;Unnamed: 4&#39;</span><span class="p">,</span><span class="s1">&#39;GDP in billions of chained 2009 dollars.1&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">GDP</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Quarter&#39;</span><span class="p">,</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="s1">&#39;2000q1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;index&#39;</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">GDP</span>
+<span class="n">clean_GDP</span><span class="p">()</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</pre></div>
+
+
+<div>
+<style>
+    .dataframe thead tr:only-child th {
+        text-align: right;
+    }
+
+    .dataframe thead th {
+        text-align: left;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Quarter</th>
+      <th>GDP in billions of chained 2009 dollars</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2000q1</td>
+      <td>12359.1</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2000q2</td>
+      <td>12592.5</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2000q3</td>
+      <td>12607.7</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2000q4</td>
+      <td>12679.3</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2001q1</td>
+      <td>12643.3</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>With our data in a usable state, it can be beneficial to plot the data so that we have a better idea of what we are looking at as we search for the start, end, and bottom of the recession.</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">plot_GDP</span><span class="p">():</span>
+    <span class="kn">import</span> <span class="nn">matplotlib</span> <span class="kn">as</span> <span class="nn">plot</span>
+    <span class="o">%</span><span class="n">matplotlib</span> <span class="n">inline</span>
+
+    <span class="n">clean_GDP</span><span class="p">()</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;Quarter&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s1">&#39;line&#39;</span><span class="p">)</span>
+
+<span class="n">plot_GDP</span><span class="p">()</span>
+</pre></div>
+
+
+<p><img alt="png" src="University_Town_Housing_Prices_in_a_Recession_files/University_Town_Housing_Prices_in_a_Recession_9_0.png"></p>
+<p>In observing this graph, it is very easy to see where the line dips down, signalling the recession. We can now find the start, end and bottom of the recession using the following definitions:</p>
+<ul>
+<li>A recession is defined as starting with two consecutive quarters of GDP decline, and ending with two consecutive quarters of GDP growth.</li>
+<li>A recession bottom is the quarter within a recession which had the lowest GDP.</li>
+</ul>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_recession_start</span><span class="p">():</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">clean_GDP</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">GDP</span><span class="p">)):</span>
+        <span class="n">twoback</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">-</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="n">oneback</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">twoback</span> <span class="o">-</span> <span class="n">oneback</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">oneback</span> <span class="o">-</span> <span class="n">current</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">-</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span>
+
+<span class="n">get_recession_start</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>&#39;2008q2&#39;
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_recession_end</span><span class="p">():</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">clean_GDP</span><span class="p">()</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">get_recession_start</span><span class="p">()]</span>
+    <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="nb">len</span><span class="p">(</span><span class="n">GDP</span><span class="p">)</span><span class="o">-</span><span class="mi">2</span><span class="p">):</span>
+        <span class="n">twoFor</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">+</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="n">oneFor</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">+</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="p">][</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">twoFor</span> <span class="o">-</span> <span class="n">oneFor</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">oneFor</span> <span class="o">-</span> <span class="n">current</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">GDP</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ind</span><span class="o">+</span><span class="mi">2</span><span class="p">][</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span>
+
+<span class="n">get_recession_end</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>&#39;2009q4&#39;
+</pre></div>
+
+
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">get_recession_bottom</span><span class="p">():</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">clean_GDP</span><span class="p">()</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">get_recession_start</span><span class="p">()]</span>
+    <span class="n">GDP</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;Quarter&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">get_recession_end</span><span class="p">()]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;index&#39;</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">bot</span> <span class="o">=</span> <span class="n">GDP</span><span class="p">[</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">GDP</span><span class="p">[</span><span class="s1">&#39;GDP in billions of chained 2009 dollars&#39;</span><span class="p">])]</span>
+    <span class="k">return</span> <span class="n">bot</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">get_recession_bottom</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>&#39;2009q2&#39;
+</pre></div>
+
+
+<h3>Testing the hypothesis</h3>
+<p>With all of our data sufficiently cleaned, we now want to test our hypothesis. In order to do, we will first create a new variable that is the ratio of the mean housing prices at the start of the recession to the mean housing prices at the bottom of the recession. In order to determine if there is a statistical difference between the ratios of non-university towns hosuing prices and university towns housing prices, we will apply a statistical T-Test. For this experiment, we will designate our critical value as p &lt;= .01. </p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">run_ttest</span><span class="p">():</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">convert_housing_data_to_quarters</span><span class="p">()</span>
+    <span class="c1">#(price_ratio=quarter_before_recession/recession_bottom)</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">get_recession_start</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">bot</span> <span class="o">=</span> <span class="n">get_recession_bottom</span><span class="p">()</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="n">start</span><span class="p">]</span><span class="o">/</span><span class="n">x</span><span class="p">[</span><span class="n">bot</span><span class="p">]</span> <span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">UTowns</span> <span class="o">=</span> <span class="n">get_list_of_university_towns</span><span class="p">()</span>
+    <span class="n">UTowns</span><span class="p">[</span><span class="s1">&#39;UTown&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">,</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">],</span><span class="n">ascending</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">UTown_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">UTowns</span><span class="p">,</span><span class="n">how</span><span class="o">=</span><span class="s1">&#39;inner&#39;</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">])[[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">,</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]]</span>
+    <span class="n">Non_UTown_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">df</span><span class="p">,</span><span class="n">UTowns</span><span class="p">,</span><span class="n">how</span><span class="o">=</span><span class="s1">&#39;left&#39;</span><span class="p">,</span><span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">])</span>
+    <span class="n">Non_UTown_df</span> <span class="o">=</span> <span class="n">Non_UTown_df</span><span class="p">[</span><span class="n">Non_UTown_df</span><span class="p">[</span><span class="s1">&#39;UTown&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">True</span><span class="p">][[</span><span class="s1">&#39;State&#39;</span><span class="p">,</span><span class="s1">&#39;RegionName&#39;</span><span class="p">,</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]]</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">ttest_ind</span><span class="p">(</span><span class="n">UTown_df</span><span class="p">[</span><span class="s1">&#39;Ratio&#39;</span><span class="p">],</span><span class="n">Non_UTown_df</span><span class="p">[</span><span class="s1">&#39;Ratio&#39;</span><span class="p">])[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">different</span> <span class="o">=</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="o">.</span><span class="mo">01</span>
+    <span class="k">if</span> <span class="n">UTown_df</span><span class="p">[</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">Non_UTown_df</span><span class="p">[</span><span class="s1">&#39;Ratio&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">():</span>
+        <span class="n">better</span> <span class="o">=</span> <span class="s1">&#39;university town&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">better</span> <span class="o">=</span> <span class="s1">&#39;non-university town&#39;</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">different</span><span class="p">,</span><span class="n">p</span><span class="p">,</span><span class="n">better</span><span class="p">)</span>
+
+<span class="n">run_ttest</span><span class="p">()</span>
+</pre></div>
+
+
+<div class="highlight"><pre><span></span>(True, 0.0030282360267394315, &#39;university town&#39;)
+</pre></div>
+
+
+<h3>Conclusions</h3>
+<p>Because our P value is less than our critical value, we can reject our null hypothesis and state that there is a difference in the housing price changes during a recession between university towns and non university towns. This suggestion of a difference between the two along with the lower price change ratio in the university towns would suggest that our hypothesis is true: University Towns do have their mean housing prices less affected by recessions.</p>
+    </div><!-- /.entry-content -->
+
+  </article>
+</section>
+        <section id="extras" class="body">
+                <div class="blogroll">
+                        <h2>links</h2>
+                        <ul>
+                            <li><a href="http://getpelican.com/">Pelican</a></li>
+                            <li><a href="http://python.org/">Python.org</a></li>
+                            <li><a href="http://jinja.pocoo.org/">Jinja2</a></li>
+                            <li><a href="#">You can modify those links in your config file</a></li>
+                        </ul>
+                </div><!-- /.blogroll -->
+                <div class="social">
+                        <h2>social</h2>
+                        <ul>
+
+                            <li><a href="#">You can add links in your config file</a></li>
+                            <li><a href="#">Another social link</a></li>
+                        </ul>
+                </div><!-- /.social -->
+        </section><!-- /#extras -->
+
+        <footer id="contentinfo" class="body">
+                <address id="about" class="vcard body">
+                Proudly powered by <a href="http://getpelican.com/">Pelican</a>, which takes great advantage of <a href="http://python.org">Python</a>.
+                </address><!-- /#about -->
+
+                <p>The theme is by <a href="http://coding.smashingmagazine.com/2009/08/04/designing-a-html-5-layout-from-scratch/">Smashing Magazine</a>, thanks!</p>
+        </footer><!-- /#contentinfo -->
+
+</body>
+</html>
